@@ -107,6 +107,9 @@ fn transfer_changes_owner() {
         System::set_block_number(1);
         let asset_id = mint_default(1);
 
+        // Owner must sign the contract before transferring (design doc requirement).
+        assert_ok!(AssetTokenization::sign_contract(RuntimeOrigin::signed(1), asset_id));
+
         assert_ok!(AssetTokenization::transfer_asset(
             RuntimeOrigin::signed(1),
             asset_id,
@@ -170,5 +173,93 @@ fn non_owner_cannot_transfer() {
             AssetTokenization::transfer_asset(RuntimeOrigin::signed(99), asset_id, 3u64),
             Error::<Test>::NotAssetOwner
         );
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. Transfer blocked until owner has signed the contract (Gap 1)
+// ─────────────────────────────────────────────────────────────────────────────
+#[test]
+fn transfer_blocked_until_owner_signs() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let asset_id = mint_default(1);
+
+        // Attempt to transfer before signing the contract must fail.
+        assert_noop!(
+            AssetTokenization::transfer_asset(RuntimeOrigin::signed(1), asset_id, 2u64),
+            Error::<Test>::ContractNotSigned
+        );
+
+        // After the owner signs, the transfer succeeds.
+        assert_ok!(AssetTokenization::sign_contract(RuntimeOrigin::signed(1), asset_id));
+        assert_ok!(AssetTokenization::transfer_asset(
+            RuntimeOrigin::signed(1),
+            asset_id,
+            2u64,
+        ));
+        assert_eq!(AssetOwner::<Test>::get(asset_id), Some(2u64));
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. Fungible supply consistency guard (Gap 3)
+// ─────────────────────────────────────────────────────────────────────────────
+#[test]
+fn inconsistent_fungible_supply_rejected() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let name: BoundedVec<u8, frame_support::traits::ConstU32<64>> =
+            BoundedVec::try_from(b"Bad Asset".to_vec()).unwrap();
+        let uri: BoundedVec<u8, frame_support::traits::ConstU32<256>> =
+            BoundedVec::try_from(b"ipfs://Qm123".to_vec()).unwrap();
+
+        // is_fungible = true but no supply — invalid.
+        assert_noop!(
+            AssetTokenization::mint_asset(
+                RuntimeOrigin::signed(1),
+                name.clone(),
+                AssetType::Digital,
+                uri.clone(),
+                valid_hash(),
+                true,
+                None,
+            ),
+            Error::<Test>::InconsistentFungibleSupply
+        );
+
+        // is_fungible = false but supply provided — invalid.
+        assert_noop!(
+            AssetTokenization::mint_asset(
+                RuntimeOrigin::signed(1),
+                name.clone(),
+                AssetType::Physical,
+                uri.clone(),
+                valid_hash(),
+                false,
+                Some(1000),
+            ),
+            Error::<Test>::InconsistentFungibleSupply
+        );
+
+        // Consistent cases: fungible with supply, and non-fungible with None.
+        assert_ok!(AssetTokenization::mint_asset(
+            RuntimeOrigin::signed(1),
+            name.clone(),
+            AssetType::Digital,
+            uri.clone(),
+            valid_hash(),
+            true,
+            Some(1_000_000),
+        ));
+        assert_ok!(AssetTokenization::mint_asset(
+            RuntimeOrigin::signed(1),
+            name,
+            AssetType::Physical,
+            uri,
+            valid_hash(),
+            false,
+            None,
+        ));
     });
 }
