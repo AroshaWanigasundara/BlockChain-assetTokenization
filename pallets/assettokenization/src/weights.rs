@@ -51,10 +51,10 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().writes(1_u64))
     }
 
-    /// Storage: Assets (r:1 w:0), AssetOwner (r:1 w:1)
+    /// Storage: Assets (r:1 w:0), AssetOwner (r:1 w:1), ContractSignatures (r:1 w:0)
     fn transfer_asset() -> Weight {
-        Weight::from_parts(20_000_000, 0)
-            .saturating_add(T::DbWeight::get().reads(2_u64))
+        Weight::from_parts(22_000_000, 0)
+            .saturating_add(T::DbWeight::get().reads(3_u64))
             .saturating_add(T::DbWeight::get().writes(1_u64))
     }
 }
@@ -85,9 +85,10 @@ impl WeightInfo for () {
             .saturating_add(RocksDbWeight::get().writes(1_u64))
     }
 
+    /// Storage: Assets (r:1 w:0), AssetOwner (r:1 w:1), ContractSignatures (r:1 w:0)
     fn transfer_asset() -> Weight {
-        Weight::from_parts(20_000_000, 0)
-            .saturating_add(RocksDbWeight::get().reads(2_u64))
+        Weight::from_parts(22_000_000, 0)
+            .saturating_add(RocksDbWeight::get().reads(3_u64))
             .saturating_add(RocksDbWeight::get().writes(1_u64))
     }
 }
