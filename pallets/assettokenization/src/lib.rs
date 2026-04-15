@@ -153,6 +153,12 @@ pub mod pallet {
         AlreadySigned,
         /// The provided contract hash is invalid (all-zero hashes are rejected).
         InvalidContractHash,
+        /// Transfer blocked: the asset owner has not yet signed the contract.
+        /// The current owner must sign the contract before ownership can be transferred.
+        ContractNotSigned,
+        /// `fungible_supply` must be `Some` when `is_fungible` is `true`, and
+        /// `None` when `is_fungible` is `false`.
+        InconsistentFungibleSupply,
     }
 
     // -------------------------------------------------------------------------
@@ -179,6 +185,15 @@ pub mod pallet {
             let who = ensure_signed(origin)?;
 
             ensure!(contract_hash != [0u8; 32], Error::<T>::InvalidContractHash);
+
+            // Fungible supply must be consistent with the is_fungible flag.
+            // The design document treats fungible assets (fractional ownership) differently
+            // from unique NFTs, so we enforce the invariant at mint time.
+            match (is_fungible, &fungible_supply) {
+                (true, None) | (false, Some(_)) =>
+                    return Err(Error::<T>::InconsistentFungibleSupply.into()),
+                _ => {},
+            }
 
             let asset_id = NextAssetId::<T>::get();
             let current_block = <frame_system::Pallet<T>>::block_number();
@@ -297,7 +312,10 @@ pub mod pallet {
 
         /// Transfer ownership of an asset to another account.
         ///
-        /// Only the current owner may call this.
+        /// Only the current owner may call this. The owner must have signed the
+        /// contract (via `sign_contract`) before a transfer is permitted — this
+        /// ensures that rights and obligations have been formally acknowledged
+        /// before changing hands, as described in the design document.
         #[pallet::call_index(4)]
         #[pallet::weight(T::WeightInfo::transfer_asset())]
         pub fn transfer_asset(
@@ -311,6 +329,14 @@ pub mod pallet {
 
             let owner = AssetOwner::<T>::get(asset_id).ok_or(Error::<T>::AssetNotFound)?;
             ensure!(owner == who, Error::<T>::NotAssetOwner);
+
+            // The design document states: "The pallet may include a check that prevents
+            // transfer until signatures are recorded." We require the current owner to
+            // have signed before they can hand the asset on.
+            ensure!(
+                ContractSignatures::<T>::contains_key(asset_id, &who),
+                Error::<T>::ContractNotSigned
+            );
 
             AssetOwner::<T>::insert(asset_id, to.clone());
 
