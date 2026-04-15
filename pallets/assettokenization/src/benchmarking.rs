@@ -87,12 +87,68 @@ mod benchmarks {
         );
         AssetOwner::<T>::insert(0u64, owner.clone());
         NextAssetId::<T>::put(1u64);
+        // Owner must have signed the contract before transfer is permitted.
+        ContractSignatures::<T>::insert(0u64, &owner, 0u64);
 
         let recipient: T::AccountId = account("recipient", 0, 0);
         #[extrinsic_call]
         transfer_asset(RawOrigin::Signed(owner), 0u64, recipient.clone());
 
         assert_eq!(AssetOwner::<T>::get(0u64), Some(recipient));
+    }
+
+    #[benchmark]
+    fn update_contract() {
+        let owner: T::AccountId = whitelisted_caller();
+        Assets::<T>::insert(
+            0u64,
+            crate::pallet::AssetInfo {
+                name: make_name(),
+                asset_type: AssetType::Digital,
+                contract_uri: make_uri(),
+                contract_hash: valid_hash(),
+                is_fungible: false,
+                fungible_supply: None,
+                creator: owner.clone(),
+                created_at: frame_system::Pallet::<T>::block_number(),
+            },
+        );
+        AssetOwner::<T>::insert(0u64, owner.clone());
+        NextAssetId::<T>::put(1u64);
+
+        let new_uri: BoundedVec<u8, frame_support::traits::ConstU32<256>> =
+            BoundedVec::try_from(b"ipfs://QmUpdated".to_vec()).unwrap();
+        let new_hash = [2u8; 32];
+        #[extrinsic_call]
+        update_contract(RawOrigin::Signed(owner), 0u64, new_uri, new_hash);
+
+        let info = Assets::<T>::get(0u64).unwrap();
+        assert_eq!(info.contract_hash, new_hash);
+    }
+
+    #[benchmark]
+    fn freeze_asset() {
+        let owner: T::AccountId = whitelisted_caller();
+        Assets::<T>::insert(
+            0u64,
+            crate::pallet::AssetInfo {
+                name: make_name(),
+                asset_type: AssetType::Physical,
+                contract_uri: make_uri(),
+                contract_hash: valid_hash(),
+                is_fungible: false,
+                fungible_supply: None,
+                creator: owner.clone(),
+                created_at: frame_system::Pallet::<T>::block_number(),
+            },
+        );
+        AssetOwner::<T>::insert(0u64, owner.clone());
+        NextAssetId::<T>::put(1u64);
+
+        #[extrinsic_call]
+        freeze_asset(RawOrigin::Signed(owner), 0u64);
+
+        assert!(FrozenAssets::<T>::get(0u64));
     }
 
     impl_benchmark_test_suite!(
