@@ -17,17 +17,22 @@ pub trait WeightInfo {
     fn update_contract() -> Weight;
     fn freeze_asset() -> Weight;
     fn transfer_asset() -> Weight;
+    fn create_collection() -> Weight;
+    fn set_collection_roles() -> Weight;
+    fn transfer_fungible() -> Weight;
 }
 
 /// Weights for pallet_assettokenization using the Substrate node and recommended hardware.
 pub struct SubstrateWeight<T>(PhantomData<T>);
 
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
-    /// Storage: NextAssetId (r:1 w:1), Assets (r:0 w:1), AssetOwner (r:0 w:1)
+    /// Storage: NextAssetId (r:1 w:1), Assets (r:0 w:1), AssetOwner (r:0 w:1),
+    ///          Collections (r:1 w:0), CollectionRoles (r:1 w:0),
+    ///          AssetCollection (r:0 w:1), FungibleBalances (r:0 w:1)
     fn mint_asset() -> Weight {
-        Weight::from_parts(25_000_000, 0)
-            .saturating_add(T::DbWeight::get().reads(1_u64))
-            .saturating_add(T::DbWeight::get().writes(3_u64))
+        Weight::from_parts(35_000_000, 0)
+            .saturating_add(T::DbWeight::get().reads(3_u64))
+            .saturating_add(T::DbWeight::get().writes(5_u64))
     }
 
     /// Storage: Assets (r:1 w:0), FrozenAssets (r:1 w:0), ContractSignatures (r:1 w:1)
@@ -37,17 +42,19 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().writes(1_u64))
     }
 
-    /// Storage: FrozenAssets (r:1 w:0), AssetOwner (r:1 w:0), Assets (r:1 w:1)
+    /// Storage: FrozenAssets (r:1 w:0), AssetOwner (r:1 w:0), Assets (r:1 w:1),
+    ///          ContractHistory (r:0 w:1), ContractHistoryCount (r:1 w:1)
     fn update_contract() -> Weight {
-        Weight::from_parts(22_000_000, 0)
-            .saturating_add(T::DbWeight::get().reads(3_u64))
-            .saturating_add(T::DbWeight::get().writes(1_u64))
+        Weight::from_parts(28_000_000, 0)
+            .saturating_add(T::DbWeight::get().reads(4_u64))
+            .saturating_add(T::DbWeight::get().writes(3_u64))
     }
 
-    /// Storage: Assets (r:1 w:0), AssetOwner (r:1 w:0), FrozenAssets (r:1 w:1)
+    /// Storage: Assets (r:1 w:0), AssetOwner (r:1 w:0), AssetCollection (r:1 w:0),
+    ///          Collections (r:1 w:0), CollectionRoles (r:1 w:0), FrozenAssets (r:1 w:1)
     fn freeze_asset() -> Weight {
-        Weight::from_parts(18_000_000, 0)
-            .saturating_add(T::DbWeight::get().reads(3_u64))
+        Weight::from_parts(24_000_000, 0)
+            .saturating_add(T::DbWeight::get().reads(6_u64))
             .saturating_add(T::DbWeight::get().writes(1_u64))
     }
 
@@ -57,14 +64,36 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().reads(3_u64))
             .saturating_add(T::DbWeight::get().writes(1_u64))
     }
+
+    /// Storage: NextCollectionId (r:1 w:1), Collections (r:0 w:1)
+    fn create_collection() -> Weight {
+        Weight::from_parts(16_000_000, 0)
+            .saturating_add(T::DbWeight::get().reads(1_u64))
+            .saturating_add(T::DbWeight::get().writes(2_u64))
+    }
+
+    /// Storage: Collections (r:1 w:0), CollectionRoles (r:1 w:1)
+    fn set_collection_roles() -> Weight {
+        Weight::from_parts(18_000_000, 0)
+            .saturating_add(T::DbWeight::get().reads(2_u64))
+            .saturating_add(T::DbWeight::get().writes(1_u64))
+    }
+
+    /// Storage: Assets (r:1 w:0), FrozenAssets (r:1 w:0),
+    ///          FungibleBalances sender (r:1 w:1), FungibleBalances recipient (r:1 w:1)
+    fn transfer_fungible() -> Weight {
+        Weight::from_parts(24_000_000, 0)
+            .saturating_add(T::DbWeight::get().reads(4_u64))
+            .saturating_add(T::DbWeight::get().writes(2_u64))
+    }
 }
 
-// For backwards compatibility and tests.
+/// Fallback implementation for tests and backwards compatibility.
 impl WeightInfo for () {
     fn mint_asset() -> Weight {
-        Weight::from_parts(25_000_000, 0)
-            .saturating_add(RocksDbWeight::get().reads(1_u64))
-            .saturating_add(RocksDbWeight::get().writes(3_u64))
+        Weight::from_parts(35_000_000, 0)
+            .saturating_add(RocksDbWeight::get().reads(3_u64))
+            .saturating_add(RocksDbWeight::get().writes(5_u64))
     }
 
     fn sign_contract() -> Weight {
@@ -74,21 +103,38 @@ impl WeightInfo for () {
     }
 
     fn update_contract() -> Weight {
-        Weight::from_parts(22_000_000, 0)
-            .saturating_add(RocksDbWeight::get().reads(3_u64))
-            .saturating_add(RocksDbWeight::get().writes(1_u64))
+        Weight::from_parts(28_000_000, 0)
+            .saturating_add(RocksDbWeight::get().reads(4_u64))
+            .saturating_add(RocksDbWeight::get().writes(3_u64))
     }
 
     fn freeze_asset() -> Weight {
-        Weight::from_parts(18_000_000, 0)
-            .saturating_add(RocksDbWeight::get().reads(3_u64))
+        Weight::from_parts(24_000_000, 0)
+            .saturating_add(RocksDbWeight::get().reads(6_u64))
             .saturating_add(RocksDbWeight::get().writes(1_u64))
     }
 
-    /// Storage: Assets (r:1 w:0), AssetOwner (r:1 w:1), ContractSignatures (r:1 w:0)
     fn transfer_asset() -> Weight {
         Weight::from_parts(22_000_000, 0)
             .saturating_add(RocksDbWeight::get().reads(3_u64))
             .saturating_add(RocksDbWeight::get().writes(1_u64))
+    }
+
+    fn create_collection() -> Weight {
+        Weight::from_parts(16_000_000, 0)
+            .saturating_add(RocksDbWeight::get().reads(1_u64))
+            .saturating_add(RocksDbWeight::get().writes(2_u64))
+    }
+
+    fn set_collection_roles() -> Weight {
+        Weight::from_parts(18_000_000, 0)
+            .saturating_add(RocksDbWeight::get().reads(2_u64))
+            .saturating_add(RocksDbWeight::get().writes(1_u64))
+    }
+
+    fn transfer_fungible() -> Weight {
+        Weight::from_parts(24_000_000, 0)
+            .saturating_add(RocksDbWeight::get().reads(4_u64))
+            .saturating_add(RocksDbWeight::get().writes(2_u64))
     }
 }
