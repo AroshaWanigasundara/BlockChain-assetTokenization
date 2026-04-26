@@ -13,6 +13,8 @@
 //!   previous hash in `ContractHistory` before overwriting, giving a full audit trail.
 //! - **Fungible token ledger** — when `is_fungible = true` the full supply is credited
 //!   to the minter; `transfer_fungible` moves fractional units between accounts.
+//! - **Collection freezing** — `freeze_collection` prevents new assets from being minted
+//!   into a collection, providing immutability for completed collections.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -270,6 +272,10 @@ pub mod pallet {
             collection_id: u64,
             who: T::AccountId,
             roles: CollectionRoleSet,
+        },
+        /// A collection was frozen; no new assets may be minted into it.
+        CollectionFrozen {
+            collection_id: u64,
         },
 
         // --- fungible tokens ---
@@ -691,6 +697,42 @@ pub mod pallet {
                 to,
                 amount,
             });
+
+            Ok(())
+        }
+
+        // ── call_index 8: freeze_collection ──────────────────────────────────
+
+        /// Permanently freeze a collection to prevent new assets from being minted.
+        ///
+        /// Only the collection owner or an account with the admin role may call this.
+        /// Once frozen, the collection cannot be unfrozen and no new assets can be
+        /// minted into it.
+        #[pallet::call_index(8)]
+        #[pallet::weight(T::WeightInfo::freeze_collection())]
+        pub fn freeze_collection(
+            origin: OriginFor<T>,
+            collection_id: u64,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            Collections::<T>::try_mutate(collection_id, |maybe_info| -> DispatchResult {
+                let info = maybe_info.as_mut().ok_or(Error::<T>::CollectionNotFound)?;
+
+                // Only collection owner or admin can freeze.
+                let is_owner = info.owner == who;
+                let roles = CollectionRoles::<T>::get(collection_id, &who).unwrap_or_default();
+                ensure!(is_owner || roles.is_admin, Error::<T>::NotAuthorized);
+
+                // Prevent freezing an already frozen collection.
+                ensure!(!info.is_frozen, Error::<T>::CollectionIsFrozen);
+
+                info.is_frozen = true;
+
+                Ok(())
+            })?;
+
+            Self::deposit_event(Event::CollectionFrozen { collection_id });
 
             Ok(())
         }
