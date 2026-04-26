@@ -213,6 +213,20 @@ mod benchmarks {
         assert_eq!(FungibleBalances::<T>::get(0u64, recipient), 500_000u128);
     }
 
+    // ── freeze_collection ─────────────────────────────────────────────────────
+    // Worst case: caller is an admin (requires role read).
+    #[benchmark]
+    fn freeze_collection() {
+        let owner: T::AccountId = whitelisted_caller();
+        let coll_id = setup_collection::<T>(&owner);
+
+        #[extrinsic_call]
+        freeze_collection(RawOrigin::Signed(owner), coll_id);
+
+        let info = Collections::<T>::get(coll_id).unwrap();
+        assert!(info.is_frozen);
+    }
+
     impl_benchmark_test_suite!(
         AssetTokenization,
         crate::mock::new_test_ext(),
