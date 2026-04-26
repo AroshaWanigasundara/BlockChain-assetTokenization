@@ -20,6 +20,7 @@ pub trait WeightInfo {
     fn create_collection() -> Weight;
     fn set_collection_roles() -> Weight;
     fn transfer_fungible() -> Weight;
+    fn freeze_collection() -> Weight;
 }
 
 /// Weights for pallet_assettokenization using the Substrate node and recommended hardware.
@@ -86,6 +87,13 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().reads(4_u64))
             .saturating_add(T::DbWeight::get().writes(2_u64))
     }
+
+    /// Storage: Collections (r:1 w:1), CollectionRoles (r:1 w:0)
+    fn freeze_collection() -> Weight {
+        Weight::from_parts(20_000_000, 0)
+            .saturating_add(T::DbWeight::get().reads(2_u64))
+            .saturating_add(T::DbWeight::get().writes(1_u64))
+    }
 }
 
 /// Fallback implementation for tests and backwards compatibility.
@@ -136,5 +144,11 @@ impl WeightInfo for () {
         Weight::from_parts(24_000_000, 0)
             .saturating_add(RocksDbWeight::get().reads(4_u64))
             .saturating_add(RocksDbWeight::get().writes(2_u64))
+    }
+
+    fn freeze_collection() -> Weight {
+        Weight::from_parts(20_000_000, 0)
+            .saturating_add(RocksDbWeight::get().reads(2_u64))
+            .saturating_add(RocksDbWeight::get().writes(1_u64))
     }
 }
