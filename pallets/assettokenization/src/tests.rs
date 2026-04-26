@@ -755,3 +755,162 @@ fn clearing_roles_removes_storage_entry() {
         assert!(!CollectionRoles::<Test>::contains_key(coll_id, 2u64));
     });
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Collection Freezing Tests (to be added to tests.rs)
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 24. freeze_collection works and prevents minting
+// ─────────────────────────────────────────────────────────────────────────────
+#[test]
+fn freeze_collection_works() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let coll_id = create_default_collection(1);
+
+        assert_ok!(AssetTokenization::freeze_collection(
+            RuntimeOrigin::signed(1),
+            coll_id,
+        ));
+
+        let info = Collections::<Test>::get(coll_id).unwrap();
+        assert!(info.is_frozen);
+
+        System::assert_last_event(
+            Event::CollectionFrozen { collection_id: coll_id }.into(),
+        );
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 25. Frozen collection prevents minting
+// ─────────────────────────────────────────────────────────────────────────────
+#[test]
+fn frozen_collection_prevents_minting() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let coll_id = create_default_collection(1);
+
+        // Freeze the collection
+        assert_ok!(AssetTokenization::freeze_collection(
+            RuntimeOrigin::signed(1),
+            coll_id,
+        ));
+
+        // Try to mint - should fail
+        let name: BoundedVec<u8, frame_support::traits::ConstU32<64>> =
+            BoundedVec::try_from(b"Asset".to_vec()).unwrap();
+        let uri: BoundedVec<u8, frame_support::traits::ConstU32<256>> =
+            BoundedVec::try_from(b"ipfs://QmTest".to_vec()).unwrap();
+
+        assert_noop!(
+            AssetTokenization::mint_asset(
+                RuntimeOrigin::signed(1),
+                name,
+                AssetType::Digital,
+                uri,
+                valid_hash(),
+                false,
+                None,
+                Some(coll_id),
+            ),
+            Error::<Test>::CollectionIsFrozen
+        );
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 26. Only owner or admin can freeze collection
+// ─────────────────────────────────────────────────────────────────────────────
+#[test]
+fn only_owner_or_admin_can_freeze_collection() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let coll_id = create_default_collection(1);
+
+        // Random account cannot freeze
+        assert_noop!(
+            AssetTokenization::freeze_collection(RuntimeOrigin::signed(99), coll_id),
+            Error::<Test>::NotAuthorized
+        );
+
+        // Grant admin role to account 2
+        assert_ok!(AssetTokenization::set_collection_roles(
+            RuntimeOrigin::signed(1),
+            coll_id,
+            2u64,
+            CollectionRoleSet { is_admin: true, is_issuer: false, is_freezer: false },
+        ));
+
+        // Admin can freeze
+        assert_ok!(AssetTokenization::freeze_collection(
+            RuntimeOrigin::signed(2),
+            coll_id,
+        ));
+
+        let info = Collections::<Test>::get(coll_id).unwrap();
+        assert!(info.is_frozen);
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 27. Cannot freeze already frozen collection
+// ─────────────────────────────────────────────────────────────────────────────
+#[test]
+fn cannot_freeze_already_frozen_collection() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let coll_id = create_default_collection(1);
+
+        assert_ok!(AssetTokenization::freeze_collection(
+            RuntimeOrigin::signed(1),
+            coll_id,
+        ));
+
+        // Try to freeze again - should fail
+        assert_noop!(
+            AssetTokenization::freeze_collection(RuntimeOrigin::signed(1), coll_id),
+            Error::<Test>::CollectionIsFrozen
+        );
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 28. Issuer and freezer roles cannot freeze collection
+// ─────────────────────────────────────────────────────────────────────────────
+#[test]
+fn issuer_freezer_roles_cannot_freeze_collection() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let coll_id = create_default_collection(1);
+
+        // Grant issuer role to account 2
+        assert_ok!(AssetTokenization::set_collection_roles(
+            RuntimeOrigin::signed(1),
+            coll_id,
+            2u64,
+            CollectionRoleSet { is_admin: false, is_issuer: true, is_freezer: false },
+        ));
+
+        // Issuer cannot freeze collection
+        assert_noop!(
+            AssetTokenization::freeze_collection(RuntimeOrigin::signed(2), coll_id),
+            Error::<Test>::NotAuthorized
+        );
+
+        // Grant freezer role to account 3
+        assert_ok!(AssetTokenization::set_collection_roles(
+            RuntimeOrigin::signed(1),
+            coll_id,
+            3u64,
+            CollectionRoleSet { is_admin: false, is_issuer: false, is_freezer: true },
+        ));
+
+        // Freezer cannot freeze collection (can only freeze individual assets)
+        assert_noop!(
+            AssetTokenization::freeze_collection(RuntimeOrigin::signed(3), coll_id),
+            Error::<Test>::NotAuthorized
+        );
+    });
+}
